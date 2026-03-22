@@ -8,7 +8,7 @@
     
     <style>
         :root { --bg: #000; --panel: #1a1a1a; --accent: #007bff; --danger: #dc3545; --success: #28a745; --warning: #ffc107; }
-        * { box-sizing: border-box; }
+        * { box-sizing: border-box; touch-action: manipulation; }
         body { margin: 0; font-family: sans-serif; background: var(--bg); color: white; height: 100vh; width: 100vw; overflow: hidden; }
 
         #app { display: grid; grid-template-rows: 1fr 1fr auto; height: 100vh; }
@@ -18,25 +18,33 @@
             .controls { grid-column: span 2; }
         }
 
+        /* Prompter Area - Now Scrollable */
         #prompter-container {
-            position: relative; background: #050505; overflow: hidden;
-            display: flex; justify-content: center; align-items: center; border-bottom: 1px solid #333;
+            position: relative; background: #050505; 
+            overflow-y: auto; /* Enable native scrolling */
+            overflow-x: hidden;
+            display: block; /* Changed from flex to allow scrolling */
+            border-bottom: 1px solid #333;
+            -webkit-overflow-scrolling: touch;
         }
 
         #focus-zone {
-            position: absolute; top: 50%; left: 0; width: 100%; height: 60px;
+            position: sticky; /* Stays in the middle while content moves */
+            top: 50%; left: 0; width: 100%; height: 60px;
             background: rgba(255, 255, 0, 0.1); border-top: 1px solid rgba(255, 255, 0, 0.3);
             border-bottom: 1px solid rgba(255, 255, 0, 0.3); transform: translateY(-50%);
             z-index: 10; pointer-events: none;
         }
 
         #script-display {
-            width: 90%; text-align: center; font-size: 32px; font-weight: bold;
-            line-height: 1.4; z-index: 5; white-space: pre-wrap; transition: transform 0.1s linear;
+            padding: 50vh 20px; /* Buffer to allow first/last lines to hit the focus zone */
+            width: 100%; text-align: center; font-size: 32px; font-weight: bold;
+            line-height: 1.5; z-index: 5; white-space: pre-wrap; 
+            transition: none; /* Removed CSS transform for native scroll */
         }
 
         #video-container { background: #000; overflow: hidden; border-bottom: 1px solid #333; }
-        video { width: 100%; height: 100%; object-fit: cover; transform: scaleX(-1); } /* Mirrored preview for natural feel */
+        video { width: 100%; height: 100%; object-fit: cover; transform: scaleX(-1); }
 
         .controls { background: var(--panel); padding: 10px; display: flex; flex-direction: column; gap: 8px; }
         textarea { width: 100%; height: 40px; background: #222; color: #fff; border: 1px solid #444; border-radius: 4px; padding: 5px; font-size: 14px; }
@@ -62,7 +70,7 @@
 <body>
 
 <div id="app">
-    <div id="prompter-container">
+    <div id="prompter-container" id="scroll-area">
         <div id="focus-zone"></div>
         <div id="script-display">Script goes here...</div>
     </div>
@@ -75,8 +83,8 @@
         <textarea id="script-input" placeholder="Enter script here..."></textarea>
         
         <div class="sliders">
-            <div class="slider-item"><label>Speed</label><input type="range" id="speed-control" min="1" max="15" value="5"></div>
-            <div class="slider-item"><label>Size</label><input type="range" id="font-control" min="16" max="80" value="32"></div>
+            <div class="slider-item"><label>Speed</label><input type="range" id="speed-control" min="1" max="20" value="5"></div>
+            <div class="slider-item"><label>Size</label><input type="range" id="font-control" min="16" max="100" value="32"></div>
             <div class="slider-item"><label>Color</label><input type="color" id="color-control" value="#ffff00"></div>
         </div>
 
@@ -95,8 +103,10 @@
 <div id="countdown-overlay"><div id="cd-num">3</div></div>
 
 <script>
-    let mediaRecorder, recordedChunks = [], isMirrored = false, scrollPos = 0, animFrame, activeStream;
+    let mediaRecorder, recordedChunks = [], isMirrored = false, animFrame, activeStream;
+    let isAutoScrolling = false;
 
+    const container = document.getElementById('prompter-container');
     const scriptDisplay = document.getElementById('script-display');
     const scriptInput = document.getElementById('script-input');
     const speedCtrl = document.getElementById('speed-control');
@@ -105,7 +115,9 @@
     const stopBtn = document.getElementById('stop-btn');
     const restartBtn = document.getElementById('restart-btn');
 
-    // Controls
+    // Sync Text instantly
+    scriptInput.oninput = () => { scriptDisplay.innerText = scriptInput.value; };
+
     fontCtrl.oninput = () => {
         scriptDisplay.style.fontSize = fontCtrl.value + 'px';
         document.getElementById('focus-zone').style.height = (fontCtrl.value * 1.6) + 'px';
@@ -119,12 +131,8 @@
 
     document.getElementById('mirror-btn').onclick = () => {
         isMirrored = !isMirrored;
-        updateScrollPos();
+        scriptDisplay.style.transform = isMirrored ? 'scaleX(-1)' : 'scaleX(1)';
     };
-
-    function updateScrollPos() {
-        scriptDisplay.style.transform = `translateY(${scrollPos}px) scaleX(${isMirrored ? -1 : 1})`;
-    }
 
     // File Management
     document.getElementById('save-btn').onclick = () => {
@@ -146,13 +154,11 @@
             activeStream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "user" }, audio: true });
             document.getElementById('preview').srcObject = activeStream;
             runCountdown();
-        } catch (err) { alert("Camera access required for recording."); }
+        } catch (err) { alert("Camera access required."); }
     };
 
     function runCountdown() {
-        scriptDisplay.innerText = scriptInput.value || "Ready...";
-        scrollPos = 0;
-        updateScrollPos();
+        scriptDisplay.innerText = scriptInput.value || "No script loaded...";
         
         let count = 3;
         const overlay = document.getElementById('countdown-overlay');
@@ -182,38 +188,43 @@
         stopBtn.style.display = 'block';
         restartBtn.style.display = 'block';
 
-        const animate = () => {
-            if(mediaRecorder && mediaRecorder.state === "recording") {
-                scrollPos -= parseFloat(speedCtrl.value) / 5;
-                updateScrollPos();
-                animFrame = requestAnimationFrame(animate);
+        isAutoScrolling = true;
+        const scrollLoop = () => {
+            if (isAutoScrolling && mediaRecorder && mediaRecorder.state === "recording") {
+                container.scrollTop += parseFloat(speedCtrl.value) / 10;
+                animFrame = requestAnimationFrame(scrollLoop);
             }
         };
-        animate();
+        scrollLoop();
     }
 
-    function stopLogic() {
+    // Pause auto-scroll on touch, resume after short delay
+    container.addEventListener('touchstart', () => { isAutoScrolling = false; });
+    container.addEventListener('touchend', () => { 
+        setTimeout(() => { if(mediaRecorder && mediaRecorder.state === "recording") isAutoScrolling = true; }, 1000);
+    });
+
+    stopBtn.onclick = () => {
+        isAutoScrolling = false;
         if(mediaRecorder) mediaRecorder.stop();
         if(activeStream) activeStream.getTracks().forEach(t => t.stop());
         cancelAnimationFrame(animFrame);
         startBtn.style.display = 'block';
         stopBtn.style.display = 'none';
         restartBtn.style.display = 'none';
-    }
-
-    stopBtn.onclick = stopLogic;
+    };
 
     restartBtn.onclick = () => {
-        cancelAnimationFrame(animFrame);
-        if(mediaRecorder) mediaRecorder.stop(); // This will trigger export of the current take
-        runCountdown(); // Immediately start the countdown for a fresh take
+        isAutoScrolling = false;
+        if(mediaRecorder) mediaRecorder.stop();
+        runCountdown();
     };
 
     function exportVideo() {
         if (recordedChunks.length === 0) return;
         const a = document.createElement('a');
         a.href = URL.createObjectURL(new Blob(recordedChunks, { type: 'video/webm' })); 
-        a.download = `Take-${Date.now()}.webm`;
+        a.download = `PrompterTake-${Date.now()}.webm`;
         a.click();
     }
 </script>
