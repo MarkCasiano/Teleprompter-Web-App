@@ -7,85 +7,56 @@
     <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🎥</text></svg>">
     
     <style>
-        :root { --bg: #000; --panel: #1a1a1a; --accent: #007bff; --danger: #dc3545; --success: #28a745; }
-        body { margin: 0; font-family: -apple-system, sans-serif; background: var(--bg); color: white; overflow: hidden; height: 100vh; }
-        
-        #app { display: flex; flex-direction: column; height: 100vh; }
+        :root { --bg: #000; --panel: #1a1a1a; --accent: #007bff; --danger: #dc3545; --success: #28a745; --warning: #ffc107; }
+        * { box-sizing: border-box; }
+        body { margin: 0; font-family: sans-serif; background: var(--bg); color: white; height: 100vh; width: 100vw; overflow: hidden; }
 
-        /* Teleprompter Section */
+        #app { display: grid; grid-template-rows: 1fr 1fr auto; height: 100vh; }
+
+        @media (orientation: landscape) {
+            #app { grid-template-rows: 1fr auto; grid-template-columns: 1fr 1fr; }
+            .controls { grid-column: span 2; }
+        }
+
         #prompter-container {
-            flex: 1.2;
-            overflow: hidden;
-            position: relative;
-            background: #0a0a0a;
-            border-bottom: 2px solid #333;
-            display: flex;
-            justify-content: center;
+            position: relative; background: #050505; overflow: hidden;
+            display: flex; justify-content: center; align-items: center; border-bottom: 1px solid #333;
         }
 
         #focus-zone {
-            position: absolute;
-            top: 50%;
-            left: 0;
-            width: 100%;
-            height: 60px;
-            background: rgba(255, 255, 0, 0.15);
-            border-top: 1px solid rgba(255, 255, 0, 0.4);
-            border-bottom: 1px solid rgba(255, 255, 0, 0.4);
-            transform: translateY(-50%);
-            pointer-events: none;
-            z-index: 10;
+            position: absolute; top: 50%; left: 0; width: 100%; height: 60px;
+            background: rgba(255, 255, 0, 0.1); border-top: 1px solid rgba(255, 255, 0, 0.3);
+            border-bottom: 1px solid rgba(255, 255, 0, 0.3); transform: translateY(-50%);
+            z-index: 10; pointer-events: none;
         }
 
         #script-display {
-            padding: 40px 20px;
-            font-size: 32px;
-            line-height: 1.5;
-            text-align: center;
-            position: absolute;
-            width: 90%;
-            z-index: 5;
-            transition: transform 0.1s linear;
-            white-space: pre-wrap;
-            font-weight: bold;
+            width: 90%; text-align: center; font-size: 32px; font-weight: bold;
+            line-height: 1.4; z-index: 5; white-space: pre-wrap; transition: transform 0.1s linear;
         }
 
-        /* Video Preview */
-        #video-container { flex: 0.8; background: #000; position: relative; }
-        video { width: 100%; height: 100%; object-fit: cover; }
+        #video-container { background: #000; overflow: hidden; border-bottom: 1px solid #333; }
+        video { width: 100%; height: 100%; object-fit: cover; transform: scaleX(-1); } /* Mirrored preview for natural feel */
 
-        /* Controls Panel */
-        .controls {
-            padding: 12px;
-            background: var(--panel);
-            display: flex;
-            flex-direction: column;
-            gap: 10px;
-            z-index: 20;
-            box-shadow: 0 -5px 15px rgba(0,0,0,0.5);
-        }
+        .controls { background: var(--panel); padding: 10px; display: flex; flex-direction: column; gap: 8px; }
+        textarea { width: 100%; height: 40px; background: #222; color: #fff; border: 1px solid #444; border-radius: 4px; padding: 5px; font-size: 14px; }
 
-        textarea { height: 50px; background: #222; color: #fff; border: 1px solid #444; border-radius: 4px; padding: 8px; font-size: 14px; resize: none; }
-        
-        .btn-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
-        button { padding: 12px; border-radius: 6px; border: none; font-weight: bold; color: white; cursor: pointer; font-size: 13px; }
-        
-        #start-btn { background: var(--success); grid-column: span 2; font-size: 16px; }
+        .sliders { display: flex; gap: 10px; }
+        .slider-item { flex: 1; display: flex; flex-direction: column; font-size: 10px; color: #888; }
+
+        .btn-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 5px; }
+        button { padding: 10px 2px; border-radius: 4px; border: none; font-weight: bold; color: white; cursor: pointer; font-size: 11px; }
+
+        #start-btn { background: var(--success); grid-column: span 3; font-size: 16px; }
         #stop-btn { background: var(--danger); grid-column: span 2; font-size: 16px; display: none; }
+        #restart-btn { background: var(--warning); color: black; display: none; font-size: 16px; }
         .util-btn { background: #444; }
 
-        .sliders { display: flex; gap: 10px; flex-wrap: wrap; }
-        .slider-item { flex: 1; min-width: 80px; display: flex; flex-direction: column; font-size: 10px; color: #999; text-transform: uppercase; }
-        input[type=range] { width: 100%; margin-top: 4px; }
-        input[type=color] { width: 100%; height: 25px; border: none; background: none; }
-
-        /* Countdown Overlay */
         #countdown-overlay {
-            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
-            background: rgba(0,0,0,0.9); display: none; justify-content: center;
-            align-items: center; z-index: 1000; 
+            position: fixed; inset: 0; background: rgba(0,0,0,0.85);
+            display: none; justify-content: center; align-items: center; z-index: 1000;
         }
-        #cd-num { font-size: 150px; font-weight: bold; color: #ffcc00; }
+        #cd-num { font-size: 120px; color: #ffcc00; font-weight: bold; }
     </style>
 </head>
 <body>
@@ -93,7 +64,7 @@
 <div id="app">
     <div id="prompter-container">
         <div id="focus-zone"></div>
-        <div id="script-display">Your script will appear here...</div>
+        <div id="script-display">Script goes here...</div>
     </div>
 
     <div id="video-container">
@@ -101,29 +72,21 @@
     </div>
 
     <div class="controls">
-        <textarea id="script-input" placeholder="Paste your script here..."></textarea>
+        <textarea id="script-input" placeholder="Enter script here..."></textarea>
         
         <div class="sliders">
-            <div class="slider-item">
-                <label>Speed</label>
-                <input type="range" id="speed-control" min="1" max="15" value="4">
-            </div>
-            <div class="slider-item">
-                <label>Size</label>
-                <input type="range" id="font-control" min="16" max="80" value="32">
-            </div>
-            <div class="slider-item">
-                <label>Zone Color</label>
-                <input type="color" id="color-control" value="#ffff00">
-            </div>
+            <div class="slider-item"><label>Speed</label><input type="range" id="speed-control" min="1" max="15" value="5"></div>
+            <div class="slider-item"><label>Size</label><input type="range" id="font-control" min="16" max="80" value="32"></div>
+            <div class="slider-item"><label>Color</label><input type="color" id="color-control" value="#ffff00"></div>
         </div>
 
         <div class="btn-grid">
-            <button id="start-btn">🔴 Start Recording</button>
-            <button id="stop-btn">⬜ Stop & Save Video</button>
-            <button id="mirror-btn" class="util-btn">Mirror: OFF</button>
-            <button id="load-btn" class="util-btn">📂 Load Script</button>
-            <button id="save-btn" class="util-btn">💾 Save Script</button>
+            <button id="start-btn">🔴 START RECORDING</button>
+            <button id="stop-btn">⬜ STOP & SAVE</button>
+            <button id="restart-btn">🔄 RESTART</button>
+            <button id="mirror-btn" class="util-btn">MIRROR TEXT</button>
+            <button id="load-btn" class="util-btn">LOAD TXT</button>
+            <button id="save-btn" class="util-btn">SAVE TXT</button>
         </div>
         <input type="file" id="file-input" style="display:none" accept=".txt">
     </div>
@@ -132,118 +95,126 @@
 <div id="countdown-overlay"><div id="cd-num">3</div></div>
 
 <script>
-    let mediaRecorder;
-    let recordedChunks = [];
-    let isMirrored = false;
-    let scrollPos = 150;
+    let mediaRecorder, recordedChunks = [], isMirrored = false, scrollPos = 0, animFrame, activeStream;
 
     const scriptDisplay = document.getElementById('script-display');
     const scriptInput = document.getElementById('script-input');
     const speedCtrl = document.getElementById('speed-control');
     const fontCtrl = document.getElementById('font-control');
-    const colorCtrl = document.getElementById('color-control');
     const startBtn = document.getElementById('start-btn');
     const stopBtn = document.getElementById('stop-btn');
-    const cdOverlay = document.getElementById('countdown-overlay');
-    const cdNum = document.getElementById('cd-num');
+    const restartBtn = document.getElementById('restart-btn');
 
-    // UI Listeners
+    // Controls
     fontCtrl.oninput = () => {
         scriptDisplay.style.fontSize = fontCtrl.value + 'px';
         document.getElementById('focus-zone').style.height = (fontCtrl.value * 1.6) + 'px';
     };
 
-    colorCtrl.oninput = (e) => {
+    document.getElementById('color-control').oninput = (e) => {
         const zone = document.getElementById('focus-zone');
-        zone.style.background = e.target.value + "26"; // 15% opacity
-        zone.style.borderColor = e.target.value + "80"; // 50% opacity
+        zone.style.background = e.target.value + "26";
+        zone.style.borderColor = e.target.value + "80";
     };
 
-    document.getElementById('mirror-btn').onclick = (e) => {
+    document.getElementById('mirror-btn').onclick = () => {
         isMirrored = !isMirrored;
-        e.target.innerText = isMirrored ? "Mirror: ON" : "Mirror: OFF";
-        scriptDisplay.style.transform = `scaleX(${isMirrored ? -1 : 1})`;
+        updateScrollPos();
     };
 
-    // File Handlers
+    function updateScrollPos() {
+        scriptDisplay.style.transform = `translateY(${scrollPos}px) scaleX(${isMirrored ? -1 : 1})`;
+    }
+
+    // File Management
     document.getElementById('save-btn').onclick = () => {
-        const blob = new Blob([scriptInput.value], {type: 'text/plain'});
-        const url = URL.createObjectURL(blob);
         const a = document.createElement('a');
-        a.href = url; a.download = 'script.txt'; a.click();
+        a.href = URL.createObjectURL(new Blob([scriptInput.value], {type: 'text/plain'}));
+        a.download = 'script.txt'; a.click();
     };
 
     document.getElementById('load-btn').onclick = () => document.getElementById('file-input').click();
     document.getElementById('file-input').onchange = (e) => {
         const reader = new FileReader();
-        reader.onload = (ev) => { scriptInput.value = ev.target.result; };
+        reader.onload = (ev) => { scriptInput.value = ev.target.result; scriptDisplay.innerText = ev.target.result; };
         reader.readAsText(e.target.files[0]);
     };
 
-    // Recording Flow
+    // Recording Logic
     startBtn.onclick = async () => {
         try {
-            const stream = await navigator.mediaDevices.getUserMedia({ 
-                video: { facingMode: "user", width: { ideal: 1280 }, height: { ideal: 720 } }, 
-                audio: true 
-            });
-            document.getElementById('preview').srcObject = stream;
-            scriptDisplay.innerText = scriptInput.value || "Please enter a script below...";
-            
-            let count = 3;
-            cdOverlay.style.display = 'flex';
-            cdNum.innerText = count;
-            
-            const timer = setInterval(() => {
-                count--;
-                if(count > 0) cdNum.innerText = count;
-                else {
-                    clearInterval(timer);
-                    cdOverlay.style.display = 'none';
-                    beginCapture(stream);
-                }
-            }, 1000);
-        } catch (err) { alert("Camera Permission Denied or Error: " + err); }
+            activeStream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "user" }, audio: true });
+            document.getElementById('preview').srcObject = activeStream;
+            runCountdown();
+        } catch (err) { alert("Camera access required for recording."); }
     };
 
-    function beginCapture(stream) {
+    function runCountdown() {
+        scriptDisplay.innerText = scriptInput.value || "Ready...";
+        scrollPos = 0;
+        updateScrollPos();
+        
+        let count = 3;
+        const overlay = document.getElementById('countdown-overlay');
+        const num = document.getElementById('cd-num');
+        overlay.style.display = 'flex';
+        num.innerText = count;
+
+        const timer = setInterval(() => {
+            count--;
+            if(count > 0) num.innerText = count;
+            else {
+                clearInterval(timer);
+                overlay.style.display = 'none';
+                beginCapture();
+            }
+        }, 1000);
+    }
+
+    function beginCapture() {
         recordedChunks = [];
-        mediaRecorder = new MediaRecorder(stream);
-        mediaRecorder.ondataavailable = e => { if(e.data.size > 0) recordedChunks.push(e.data); };
+        mediaRecorder = new MediaRecorder(activeStream);
+        mediaRecorder.ondataavailable = e => recordedChunks.push(e.data);
         mediaRecorder.onstop = exportVideo;
         mediaRecorder.start();
 
         startBtn.style.display = 'none';
         stopBtn.style.display = 'block';
+        restartBtn.style.display = 'block';
 
-        scrollPos = 150;
         const animate = () => {
             if(mediaRecorder && mediaRecorder.state === "recording") {
-                scrollPos -= parseFloat(speedCtrl.value) / 4;
-                const mScale = isMirrored ? -1 : 1;
-                scriptDisplay.style.transform = `translateY(${scrollPos}px) scaleX(${mScale})`;
-                requestAnimationFrame(animate);
+                scrollPos -= parseFloat(speedCtrl.value) / 5;
+                updateScrollPos();
+                animFrame = requestAnimationFrame(animate);
             }
         };
         animate();
     }
 
-    stopBtn.onclick = () => {
-        mediaRecorder.stop();
-        mediaRecorder.stream.getTracks().forEach(track => track.stop());
+    function stopLogic() {
+        if(mediaRecorder) mediaRecorder.stop();
+        if(activeStream) activeStream.getTracks().forEach(t => t.stop());
+        cancelAnimationFrame(animFrame);
         startBtn.style.display = 'block';
         stopBtn.style.display = 'none';
+        restartBtn.style.display = 'none';
+    }
+
+    stopBtn.onclick = stopLogic;
+
+    restartBtn.onclick = () => {
+        cancelAnimationFrame(animFrame);
+        if(mediaRecorder) mediaRecorder.stop(); // This will trigger export of the current take
+        runCountdown(); // Immediately start the countdown for a fresh take
     };
 
     function exportVideo() {
-        const blob = new Blob(recordedChunks, { type: 'video/webm' });
-        const url = URL.createObjectURL(blob);
+        if (recordedChunks.length === 0) return;
         const a = document.createElement('a');
-        a.href = url; 
-        a.download = `PrompterVideo-${new Date().getTime()}.webm`;
-        document.body.appendChild(a);
+        a.href = URL.createObjectURL(new Blob(recordedChunks, { type: 'video/webm' })); 
+        a.download = `Take-${Date.now()}.webm`;
         a.click();
-        document.body.removeChild(a);
     }
 </script>
 </body>
